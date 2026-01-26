@@ -132,7 +132,7 @@ const allSalesProduct = async (req, res) => {
 
 const createStoreManager = async (req, res) => {
   await connection.execute(`
-    CREATE USER 'store_manager'@'localhost'
+    CREATE USER 'store_manager'@'MAHMOUD'
     IDENTIFIED BY '1234'
   `);
 
@@ -143,7 +143,7 @@ const grantDeleteOnSales = async (req, res) => {
   await connection.execute(`
     GRANT DELETE
     ON retail_db.Sales
-    TO 'store_manager'@'localhost'
+   
   `);
 
   res.json({ msg: "DELETED" });
