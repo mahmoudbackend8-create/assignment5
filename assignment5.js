@@ -1,132 +1,150 @@
-//#part3
-//1//
+import mysql from "mysql2/promise";
 
-// CREATE TABLE Products(
-//     ProductId INT AUTO_INCREMENT PRIMARY KEY,
-//     productName TEXT(100),
-//     Price DECIMAL(10,2),
-//     StockQuantity INT,
-//     SuppllierId INT ,
-//     FOREIGN KEY(SuppllierId) REFERENCES Suppliers(SuppllierId)
-//     )
+const connection = await mysql.createConnection({
+  host: "localhost",
+  user: "root",
+  password: "",
+  database: "retailshop",
+});
 
+const createTables = async (req, res) => {
+  await connection.execute(`
+    CREATE TABLE Suppliers(
+    SupplierId int PRIMARY KEY AUTO_INCREMENT,
+    SupplierName TEXT(100),
+    ContactNumber TEXT(100)
+)
+  `);
 
-// CREATE TABLE Suppliers(
-//     SupplierId int PRIMARY KEY AUTO_INCREMENT,
-//     SupplierName TEXT(100),
-//     ContactNumber TEXT(100)
-// )
+  await connection.execute(`
+    CREATE TABLE Products(
+    ProductId INT AUTO_INCREMENT PRIMARY KEY,
+    productName TEXT(100),
+    Price DECIMAL(10,2),
+    StockQuantity INT,
+    SuppllierId INT ,
+    FOREIGN KEY(SuppllierId) REFERENCES Suppliers(SuppllierId)
+    )
+  `);
 
+  await connection.execute(`
+    CREATE TABLE Sales(
+    SaleId int AUTO_INCREMENT PRIMARY KEY,
+    ProductId INT ,
+    QuantitySold INT,
+    SaleDate DATE,
+    FOREIGN KEY(ProductId) REFERENCES products(ProductId)
+)
 
-// CREATE TABLE Sales(
-// SaleId int AUTO_INCREMENT PRIMARY KEY,
-//     ProductId INT ,
-//     QuantitySold INT,
-//     SaleDate DATE,
-//     FOREIGN KEY(ProductId) REFERENCES products(ProductId)
-// )
+  `);
 
-//2//
-//ALTER TABLE products ADD Category VARCHAR(100)
+  res.json({ msg: "Tables created" });
+};
 
-//3//
-// ALTER TABLE products DROP Category
+const addSupplier = async (req, res) => {
+  const { name, contact } = req.body;
+  await connection.execute(
+    "INSERT INTO Suppliers (SupplierName, ContactNumber) VALUES (?,?)",
+    [name, contact],
+  );
+  res.json({ msg: "Supplier added" });
+};
 
-//4//
-//ALTER TABLE suppliers MODIFY ContactNumber VARCHAR(100)
+const addProducts = async (req, res) => {
+  const products = req.body;
+  for (const p of products) {
+    await connection.execute(
+      `INSERT INTO Products (ProductName, Price, StockQuantity, SupplierID)
+       VALUES (?,?,?,?)`,
+      [p.name, p.price, p.stock, p.supplierId],
+    );
+  }
+  res.json({ msg: "Products added" });
+};
 
+const addSale = async (req, res) => {
+  const { productId, quantity, date } = req.body;
+  await connection.execute(
+    "INSERT INTO Sales (ProductID, QuantitySold, SaleDate) VALUES (?,?,?)",
+    [productId, quantity, date],
+  );
+  res.json({ msg: "Sale added" });
+};
 
-//5//
-//ALTER TABLE products MODIFY ProductName VARCHAR(100) NOT NULL
+const updateBreadPrice = async (req, res) => {
+  await connection.execute(
+    "UPDATE Products SET Price = 25 WHERE ProductName = 'Bread'",
+  );
+  res.json({ msg: "Price updated" });
+};
 
-//6//
-//A // 
-// //INSERT INTO Suppliers (SupplierName, ContactNumber) VALUES ('FreshFood', '01001234567');
+const deleteEggs = async (req, res) => {
+  await connection.execute("DELETE FROM Products WHERE ProductName = 'Eggs'");
+  res.json({ msg: "Eggs deleted" });
+};
 
-//b
-//INSERT INTO products(productName,price,stockQuantity,supplierId)
-//VALUES
-//("Milk",15.00,50,1),("Bread",10.00,30,1),("Eggs",20.00,40,1)
+const totalSold = async (req, res) => {
+  const [rows] = await connection.execute(`
+    SELECT p.ProductName, SUM(s.QuantitySold) AS TotalSold
+    FROM Products p
+    LEFT JOIN Sales s ON p.ProductID = s.ProductID
+    GROUP BY p.ProductID
+  `);
+  res.json(rows);
+};
 
-//c
-//INSERT INTO sales (productId,QuantitySold,saleDate) 
-//VALUES
-//(1,2,'2025-05-20')
+const highestStock = async (req, res) => {
+  const [rows] = await connection.execute(`
+    SELECT ProductName, StockQuantity
+    FROM Products
+    ORDER BY StockQuantity DESC
+    LIMIT 1
+  `);
+  res.json(rows[0]);
+};
 
-//7//
-// UPDATE products SET Price=25 WHERE ProductName="Bread"
+const suppliersStart = async (req, res) => {
+  const [rows] = await connection.execute(`
+    SELECT * FROM Suppliers
+    WHERE SupplierName LIKE 'F%'
+  `);
+  res.json(rows);
+};
 
-//8//
-//DELETE FROM products WHERE ProductName="Eggs"
+const productsNotSold = async (req, res) => {
+  const [rows] = await connection.execute(`
+    SELECT p.ProductName
+    FROM Products p
+    LEFT JOIN Sales s ON p.ProductID = s.ProductID
+    WHERE s.SaleID IS NULL
+  `);
+  res.json(rows);
+};
 
-//9//
-// SELECT p.productName, SUM(s.QuantitySold) AS totalQuantitySold
-// FROM sales AS s
-// JOIN products AS p
-// on s.productId=p.productId
-// GROUP BY p.productName
+const allSalesProduct = async (req, res) => {
+  const [rows] = await connection.execute(`
+    SELECT p.ProductName, s.QuantitySold, s.SaleDate
+    FROM Sales s
+    JOIN Products p ON s.ProductID = p.ProductID
+  `);
+  res.json(rows);
+};
 
-//10//
-// SELECT *
-// FROM products
-// WHERE stockQuantity= (SELECT MAX(stockQuantity) FROM products)
+const createStoreManager = async (req, res) => {
+  await connection.execute(`
+    CREATE USER 'store_manager'@'localhost'
+    IDENTIFIED BY '1234'
+  `);
 
-//11//
-//SELECT * FROM suppliers WHERE SupplierName LIKE "f%"
+  res.json({ msg: "created" });
+};
 
-//12
-// SELECT *
-// FROM products AS p
-// LEFT JOIN sales AS s
-// ON p.productId = s.productId
-// WHERE s.productId IS NULL
+const grantDeleteOnSales = async (req, res) => {
+  await connection.execute(`
+    GRANT DELETE
+    ON retail_db.Sales
+    TO 'store_manager'@'localhost'
+  `);
 
-//13
-// SELECT P.productName , s.saleDate
-// FROM products AS p
-// JOIN sales AS s
-// ON p.productId = s.productId;
-
-//14
-/*
-
-CREATE USER 'store_manager'@'localhost' IDENTIFIED BY 'password123';
-GRANT SELECT, INSERT, UPDATE
-ON *.*
-TO 'store_manager'@'localhost';
-FLUSH PRIVILEGES;
-
-
-
-*/
-
-//15
-/*
-REVOKE UPDATE ON store_db.* FROM 'store_manager'@'localhost';
-FLUSH PRIVILEGES;
-
- */
-
-//16
-/*
-
-
-GRANT DELETE ON store_db.Sales TO 'store_manager'@'localhost';
-FLUSH PRIVILEGES;
-
-*/
-
-
-
-//BONUS // 
-// # Write your MySQL query statement below
-// SELECT 
-//     v.customer_id,
-//     COUNT(*) AS count_no_trans
-// FROM Visits v
-// LEFT JOIN Transactions t
-//     ON v.visit_id = t.visit_id
-// WHERE t.transaction_id IS NULL
-// GROUP BY v.customer_id;
-
-//#endpart3
+  res.json({ msg: "DELETED" });
+};
